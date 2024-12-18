@@ -400,7 +400,7 @@ private fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     // Effect that changes the home category selection when there are no subscribed podcasts
-    LaunchedEffect(key1 = featuredPodcasts) {
+    LaunchedEffect(featuredPodcasts) {
         if (featuredPodcasts.isEmpty()) {
             onHomeAction(HomeAction.HomeCategorySelected(HomeCategory.Discover))
         }
