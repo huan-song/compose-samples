@@ -1,0 +1,18 @@
+<androidx.core.widget.NestedScrollView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true"
+    android:scrollIndicators="top|bottom"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:nextFocusForward="@+id/compose_view">
+    <!-- 输入框区域会自动上移避免键盘遮挡 -->
+    
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/compose_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:nextFocusForward="@+id/other_view"
+        android:focusable="true"/>
+</androidx.core.widget.NestedScrollView> 

@@ -16,7 +16,35 @@
 
 package com.example.compose.jetchat.widget.composables
 
+import android.content.Context
+import android.content.res.Configuration
+import android.view.KeyEvent
+import android.view.inputmethod.InputMethodManager
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusOrder
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceModifier
@@ -84,4 +112,63 @@ fun MessageItemPreview() {
 @Composable
 fun WidgetPreview() {
     MessagesWidget(listOf(Message("John", "This is a preview of the message Item", "8:02PM")))
+}
+
+@Composable
+fun MessageInput(
+    onMessageSent: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val config = context.resources.configuration
+    val isHardwareKeyboard = config.keyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+    var hasFocus by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    val (messageInputFocus, sendButtonFocus, moreOptionsFocus) = remember { FocusRequester.createRefs() }
+
+    LaunchedEffect(isHardwareKeyboard) {
+        if (!isHardwareKeyboard && hasFocus) {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+
+            imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    TextField(
+        value = text,
+        onValueChange = { text = it },
+        modifier = Modifier
+            .focusRequester(messageInputFocus)
+            .focusProperties {
+                next = sendButtonFocus
+                previous = moreOptionsFocus
+            }
+            .onFocusChanged { focusState ->
+                hasFocus = focusState.isFocused
+                if (focusState.isFocused && !isHardwareKeyboard) {
+                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.showSoftInput(view, 0)
+                }
+            }
+            .onKeyEvent { keyEvent ->
+                when (keyEvent.nativeKeyEvent.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_UP -> {
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        true
+                    }
+                    KeyEvent.KEYCODE_TAB -> {
+                        if (keyEvent.isShiftPressed) {
+                            focusManager.moveFocus(FocusDirection.Previous)
+                        } else {
+                            focusManager.moveFocus(FocusDirection.Next)
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+    )
 }
