@@ -16,7 +16,13 @@
 
 package com.example.compose.jetchat
 
+import android.content.ComponentCallbacks2
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.View
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -24,6 +30,8 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material3.DrawerValue.Closed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,17 +54,58 @@ import kotlinx.coroutines.launch
  */
 class NavActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
+    private var isHardwareKeyboardConnected = false
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { _, insets -> insets }
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+
+        // 启用方向键导航
+        ViewCompat.setKeyboardNavigationCluster(
+            findViewById<View>(android.R.id.content),
+            true
+        )
+        // 注册硬件键盘监听
+        val config = resources.configuration
+        isHardwareKeyboardConnected = config.keyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+        application.registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) {
+                val newKeyboardState = newConfig.keyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+                if (newKeyboardState != isHardwareKeyboardConnected) {
+                    isHardwareKeyboardConnected = newKeyboardState
+                    // 处理键盘状态变化
+                    handleHardwareKeyboardChange(newKeyboardState)
+                }
+            }
+            override fun onLowMemory() {}
+            override fun onTrimMemory(level: Int) {}
+        })
 
         setContentView(
             ComposeView(this).apply {
                 consumeWindowInsets = false
                 setContent {
+                    // Compose 状态管理
+                    var keyboardState by remember { mutableStateOf(isHardwareKeyboardConnected) }
+                    
+                    DisposableEffect(Unit) {
+                        val callback = object : ComponentCallbacks2 {
+                            override fun onConfigurationChanged(newConfig: Configuration) {
+                                val newState = newConfig.keyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+                                keyboardState = newState
+                            }
+                            override fun onLowMemory() {}
+                            override fun onTrimMemory(level: Int) {}
+                        }
+                        context.applicationContext.registerComponentCallbacks(callback)
+                        onDispose {
+                            context.applicationContext.unregisterComponentCallbacks(callback)
+                        }
+                    }
+
                     val drawerState = rememberDrawerState(initialValue = Closed)
                     val drawerOpen by viewModel.drawerShouldBeOpened
                         .collectAsStateWithLifecycle()
@@ -100,6 +149,21 @@ class NavActivity : AppCompatActivity() {
                 }
             }
         )
+    }
+
+    private fun handleHardwareKeyboardChange(connected: Boolean) {
+        if (connected) {
+            // 当硬件键盘连接时隐藏软键盘
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(window.decorView.windowToken, 0)
+        } else {
+            // 检测当前焦点是否在输入框
+            val currentFocus = window.currentFocus
+            if (currentFocus != null) {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(currentFocus, InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {
